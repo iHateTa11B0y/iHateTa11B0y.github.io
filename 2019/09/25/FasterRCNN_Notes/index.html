@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta name="generator" content="Hexo 3.9.0">
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+
+
+<title>Faster RCNN 系列细节笔记 | Cowhisper</title>
+
+
+
+    <link rel="icon" href="/favicon.ico">
+
+
+
+
+    <!-- stylesheets list from _config.yml -->
+    
+    <link rel="stylesheet" href="/css/style.css">
+    
+
+
+
+    <!-- scripts list from _config.yml -->
+    
+    <script src="/js/script.js"></script>
+    
+    <script src="/js/tocbot.min.js"></script>
+    
+
+
+
+    
+    
+        
+    
+
+
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-header header-logo"><a href="/">Toast For The Stupid World</a></div>
+            <div class="menu navbar-right">
+                
+                    <a class="menu-item" href="/archives">Posts</a>
+                
+                    <a class="menu-item" href="/category">Categories</a>
+                
+                    <a class="menu-item" href="/tag">Tags</a>
+                
+                    <a class="menu-item" href="/about">About</a>
+                
+                <input id="switch_default" type="checkbox" class="switch_default">
+                <label for="switch_default" class="toggleBtn"></label>
+            </div>
+
+        </div>
+    </nav>
+
+    
+    <nav class="navbar-mobile" id="nav-mobile">
+        <div class="container">
+            <div class="navbar-header">
+                <div>
+                    <a href="/">Toast For The Stupid World</a><a id="mobile-toggle-theme">·&nbsp;Light</a>
+                </div>
+                <div class="menu-toggle" onclick="mobileBtn()">&#9776; Menu</div>
+            </div>
+            <div class="menu" id="mobile-menu">
+                
+                    <a class="menu-item" href="/archives">Posts</a>
+                
+                    <a class="menu-item" href="/category">Categories</a>
+                
+                    <a class="menu-item" href="/tag">Tags</a>
+                
+                    <a class="menu-item" href="/about">About</a>
+                
+            </div>
+        </div>
+    </nav>
+
+</header>
+<script>
+    var mobileBtn = function f() {
+        var toggleMenu = document.getElementsByClassName("menu-toggle")[0];
+        var mobileMenu = document.getElementById("mobile-menu");
+        if(toggleMenu.classList.contains("active")){
+           toggleMenu.classList.remove("active")
+            mobileMenu.classList.remove("active")
+        }else{
+            toggleMenu.classList.add("active")
+            mobileMenu.classList.add("active")
+        }
+    }
+</script>
+        <div class="main">
+            <div class="container">
+    
+    
+        <div class="post-toc">
+    <div class="tocbot-list">
+    </div>
+    <div class="tocbot-list-menu">
+        <a class="tocbot-toc-expand" onclick="expand_toc()">Expand all</a>
+        <a onclick="go_top()">Back to top</a>
+        <a onclick="go_bottom()">Go to bottom</a>
+    </div>
+</div>
+
+<script>
+    document.ready(
+        function () {
+            tocbot.init({
+                tocSelector: '.tocbot-list',
+                contentSelector: '.post-content',
+                headingSelector: 'h1, h2, h3, h4, h5',
+                collapseDepth: 1,
+                orderedList: false,
+                scrollSmooth: true,
+            })
+        }
+    )
+
+    function expand_toc() {
+        var b = document.querySelector(".tocbot-toc-expand");
+        tocbot.init({
+            tocSelector: '.tocbot-list',
+            contentSelector: '.post-content',
+            headingSelector: 'h1, h2, h3, h4, h5',
+            collapseDepth: 6,
+            orderedList: false,
+            scrollSmooth: true,
+        });
+        b.setAttribute("onclick", "collapse_toc()");
+        b.innerHTML = "Collapse all"
+    }
+
+    function collapse_toc() {
+        var b = document.querySelector(".tocbot-toc-expand");
+        tocbot.init({
+            tocSelector: '.tocbot-list',
+            contentSelector: '.post-content',
+            headingSelector: 'h1, h2, h3, h4, h5',
+            collapseDepth: 1,
+            orderedList: false,
+            scrollSmooth: true,
+        });
+        b.setAttribute("onclick", "expand_toc()");
+        b.innerHTML = "Expand all"
+    }
+
+    function go_top() {
+        window.scrollTo(0, 0);
+    }
+
+    function go_bottom() {
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+</script>
+    
+
+    
+    <article class="post-wrap">
+        <header class="post-header">
+            <h1 class="post-title">Faster RCNN 系列细节笔记</h1>
+            
+                <div class="post-meta">
+                    
+                        Author: <a itemprop="author" rel="author" href="/">Curtain</a>
+                    
+
+                    
+                        <span class="post-time">
+                        Date: <a href="#">September 25, 2019&nbsp;&nbsp;20:00:11</a>
+                        </span>
+                    
+                    
+                </div>
+            
+        </header>
+
+        <div class="post-content">
+            <h1 id="Intros"><a href="#Intros" class="headerlink" title="Intros"></a>Intros</h1><p>最近做了一些debug的工作，比较详细的看了一下Faster RCNN 系列代码，有些细节以前没有理解到位，记录一哈。因为涉及到策略移植的问题，代码是对比着detectron和maskrcnn-benchmark一起看的，下面如果涉及到代码以maskrcnn-benchmark为例（别问为啥，问就是垃圾caffe2）。</p>
+<h1 id="Load-Weight"><a href="#Load-Weight" class="headerlink" title="Load Weight"></a>Load Weight</h1><p>detectron训练出来的weight是用pickle存的，存的就是一个numpy array。<a href="[https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/io.py#L39](https://github.com/facebookresearch/Detectron/blob/master/detectron/utils/io.py#L39)">具体代码</a></p>
+<p>maskrcnnn-benchmark load detectron训练的<code>.pkl</code>文件的时候注意weight里面key的匹配规则。简单的讲是键值处理一下之后进行最长后缀匹配。<strong>没有匹配的键值不会报错</strong>。一定注意log的信息。</p>
+<p>说一句不太相关的批话，数据转换的时候注意精度损失</p>
+<h1 id="Backbone"><a href="#Backbone" class="headerlink" title="Backbone"></a>Backbone</h1><p>backbone其实没啥好说的，需要注意的有3点。</p>
+<ul>
+<li>STRIDE_1x1<br>这个配置是是True表明在resne(x)t的bottleneck module里stride做在最开始的1x1的conv里，False表明stride做在3x3的conv里。</li>
+<li>CONV_BODY_FREEZE_AT<br>据说是目标检测的batch size比较小，freeze前两层训练会比较稳定</li>
+<li>BN的eps<br>先看下BatchNorm的公式。<br>$$\frac{\gamma(x-E[x])}{\sqrt{Var[x]+eps}} +\beta = \frac{\gamma x}{\sqrt{Var[x]+eps}} + (\beta-\frac{\gamma E[x]}{\sqrt{Var[x]+eps}})$$<br>$=\hat{\gamma}x+\hat{\beta}$<br>caffe2存下来的其实bn的weight, bias其实是$\hat{\gamma}$和$\hat{\beta}$，但是maskrcnn-benchmark load weight的时候是把他们分别load为$\gamma$和$\beta$然后running_mean, running_var分别初始化为0, 1 tensor ，这两者在eps=0的时候是完全等价的。</li>
+</ul>
+<h1 id="RPN"><a href="#RPN" class="headerlink" title="RPN"></a>RPN</h1><h2 id="网络结构"><a href="#网络结构" class="headerlink" title="网络结构"></a>网络结构</h2><p>fpn出来各层的feature map都通过同一个3x3 stride 1的conv后接一个1x1的conv bbox_reg和1x1的conv cls_logits.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">in_channel = c</span><br><span class="line">num_anchor = n</span><br><span class="line">[feature_map_lv_i] --&gt; 3x3 stride1 conv --&gt; 1x1 stride1 conv ([bbox_reg_lv_i])</span><br><span class="line">                     out_channel=c  |   out_channel= n*4</span><br><span class="line">                                    |--&gt; 1x1 stride1 conv ([cls_logits_lv_i])</span><br><span class="line">                                        out_channel = n</span><br></pre></td></tr></table></figure>
+
+<p>rpn的分类分支只做前后景，所以<code>out_channel = n</code>后接sigmoid就出分了。</p>
+<h2 id="生成proposal步骤"><a href="#生成proposal步骤" class="headerlink" title="生成proposal步骤"></a>生成proposal步骤</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">input: [feature_map_lv_i], [cls_logits_lv_i], [bbox_reg_lv_i] [anchors_lv_i]</span><br><span class="line">1. 对于每个level的feature map，feature_map_lv_i(可能有多张图)</span><br><span class="line">   &gt; cls_logits_lv_i经过sigmoid出objectness_lv_i</span><br><span class="line">   &gt; 根据objectness_lv_i, pre_nms 取top n</span><br><span class="line">   &gt; 根据bbox_reg_lv_i，anchor_lv_i decode出来proposal</span><br><span class="line">   &gt; clip_to_image + remove_small_bbox</span><br><span class="line">   &gt; nms (thresh=0.7)</span><br><span class="line">   &gt; post_nms_取top n 得到 [proposal_lv_i]</span><br><span class="line">2. [proposal_lv_i] 转换成 [proposal_image_i]</span><br><span class="line">3. 最后做一次 post_nms 取top n</span><br><span class="line">   train的时候对所有proposal做</span><br><span class="line">   test的时候对每个image的proposal做</span><br><span class="line">4. add_gt_proposal 这步只有train的时候有</span><br></pre></td></tr></table></figure>
+
+<p>Note: 生成anchor的时候会把有部分不在image内的anchor去掉</p>
+<h1 id="ROI-HEAD"><a href="#ROI-HEAD" class="headerlink" title="ROI HEAD"></a>ROI HEAD</h1><h2 id="box-head网络结构"><a href="#box-head网络结构" class="headerlink" title="box_head网络结构"></a>box_head网络结构</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">num_class = n</span><br><span class="line">[feature maps]/[anchors] --&gt; ROIAlgin/ROIPool --&gt; (fc+relu) x 2 --&gt; fc (bbox_reg)</span><br><span class="line">                                                               |    out_channel=n</span><br><span class="line">                                                               |--&gt; fc (cls_logits)</span><br><span class="line">                                                               |    out_channel=n*4</span><br></pre></td></tr></table></figure>
+
+<p>这里出得分是多分类，softmax出分</p>
+<h2 id="生成bbox的过程"><a href="#生成bbox的过程" class="headerlink" title="生成bbox的过程"></a>生成bbox的过程</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. clip to image</span><br><span class="line">2. 对每个类做nms</span><br><span class="line">3. 对每张图的bbox取前max_per_image个框</span><br></pre></td></tr></table></figure>
+
+<p>Note: 训练的时候要对proposal subsample保证正负样本比例。</p>
+<h2 id="Mask-head网络结构"><a href="#Mask-head网络结构" class="headerlink" title="Mask head网络结构"></a>Mask head网络结构</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[feature maps]/[proposals] --&gt; ROIAlgin/ROIPool --&gt; 3x3 conv * 4 --&gt; fc</span><br></pre></td></tr></table></figure>
+
+<p>Note：</p>
+<ol>
+<li>训练的时候只有正样本算loss</li>
+<li>inference mask 二次线性插值会image原来的size</li>
+</ol>
+
+        </div>
+
+        
+            <section class="post-copyright">
+                
+                    <p class="copyright-item">
+                        <span>Author:</span>
+                        <span>Curtain</span>
+                    </p>
+                
+                
+                    <p class="copyright-item">
+                        <span>Permalink:</span>
+                        <span><a href="http://yoursite.com/2019/09/25/FasterRCNN_Notes/">http://yoursite.com/2019/09/25/FasterRCNN_Notes/</a></span>
+                    </p>
+                
+                
+                    <p class="copyright-item">
+                        <span>License:</span>
+                        <span>Copyright (c) 2019 <a href="http://creativecommons.org/licenses/by-nc/4.0/">CC-BY-NC-4.0</a> LICENSE</span>
+                    </p>
+                
+                
+                     <p class="copyright-item">
+                         <span>Slogan:</span>
+                         <span>test tet?</span>
+                     </p>
+                
+
+            </section>
+        
+        <section class="post-tags">
+            <div>
+                <span>Tag(s):</span>
+                <span class="tag">
+                    
+                    
+                        <a href="/tags/Deep-Learning/"># Deep-Learning</a>
+                    
+                        <a href="/tags/Papers/"># Papers</a>
+                    
+                        
+                </span>
+            </div>
+            <div>
+                <a href="javascript:window.history.back();">back</a>
+                <span>· </span>
+                <a href="/">home</a>
+            </div>
+        </section>
+        <section class="post-nav">
+            
+            
+            <a class="next" rel="next" href="/2019/06/21/ADGMIS/">Affinity Derivation and Graph Merge for Instance Segmentation</a>
+            
+        </section>
+
+
+    </article>
+</div>
+
+        </div>
+        <footer id="footer" class="footer">
+    <div class="copyright">
+        <span>© Curtain | Powered by <a href="https://hexo.io" target="_blank">Hexo</a> & <a href="https://github.com/Siricee/hexo-theme-Chic" target="_blank">Chic</a></span>
+    </div>
+</footer>
+
+    </div>
+</body>
+</html>

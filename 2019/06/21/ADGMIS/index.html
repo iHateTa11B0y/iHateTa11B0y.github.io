@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta name="generator" content="Hexo 3.9.0">
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+
+
+
+<title>Affinity Derivation and Graph Merge for Instance Segmentation | Cowhisper</title>
+
+
+
+    <link rel="icon" href="/favicon.ico">
+
+
+
+
+    <!-- stylesheets list from _config.yml -->
+    
+    <link rel="stylesheet" href="/css/style.css">
+    
+
+
+
+    <!-- scripts list from _config.yml -->
+    
+    <script src="/js/script.js"></script>
+    
+    <script src="/js/tocbot.min.js"></script>
+    
+
+
+
+    
+    
+        
+    
+
+
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-header header-logo"><a href="/">Toast For The Stupid World</a></div>
+            <div class="menu navbar-right">
+                
+                    <a class="menu-item" href="/archives">Posts</a>
+                
+                    <a class="menu-item" href="/category">Categories</a>
+                
+                    <a class="menu-item" href="/tag">Tags</a>
+                
+                    <a class="menu-item" href="/about">About</a>
+                
+                <input id="switch_default" type="checkbox" class="switch_default">
+                <label for="switch_default" class="toggleBtn"></label>
+            </div>
+
+        </div>
+    </nav>
+
+    
+    <nav class="navbar-mobile" id="nav-mobile">
+        <div class="container">
+            <div class="navbar-header">
+                <div>
+                    <a href="/">Toast For The Stupid World</a><a id="mobile-toggle-theme">·&nbsp;Light</a>
+                </div>
+                <div class="menu-toggle" onclick="mobileBtn()">&#9776; Menu</div>
+            </div>
+            <div class="menu" id="mobile-menu">
+                
+                    <a class="menu-item" href="/archives">Posts</a>
+                
+                    <a class="menu-item" href="/category">Categories</a>
+                
+                    <a class="menu-item" href="/tag">Tags</a>
+                
+                    <a class="menu-item" href="/about">About</a>
+                
+            </div>
+        </div>
+    </nav>
+
+</header>
+<script>
+    var mobileBtn = function f() {
+        var toggleMenu = document.getElementsByClassName("menu-toggle")[0];
+        var mobileMenu = document.getElementById("mobile-menu");
+        if(toggleMenu.classList.contains("active")){
+           toggleMenu.classList.remove("active")
+            mobileMenu.classList.remove("active")
+        }else{
+            toggleMenu.classList.add("active")
+            mobileMenu.classList.add("active")
+        }
+    }
+</script>
+        <div class="main">
+            <div class="container">
+    
+    
+        <div class="post-toc">
+    <div class="tocbot-list">
+    </div>
+    <div class="tocbot-list-menu">
+        <a class="tocbot-toc-expand" onclick="expand_toc()">Expand all</a>
+        <a onclick="go_top()">Back to top</a>
+        <a onclick="go_bottom()">Go to bottom</a>
+    </div>
+</div>
+
+<script>
+    document.ready(
+        function () {
+            tocbot.init({
+                tocSelector: '.tocbot-list',
+                contentSelector: '.post-content',
+                headingSelector: 'h1, h2, h3, h4, h5',
+                collapseDepth: 1,
+                orderedList: false,
+                scrollSmooth: true,
+            })
+        }
+    )
+
+    function expand_toc() {
+        var b = document.querySelector(".tocbot-toc-expand");
+        tocbot.init({
+            tocSelector: '.tocbot-list',
+            contentSelector: '.post-content',
+            headingSelector: 'h1, h2, h3, h4, h5',
+            collapseDepth: 6,
+            orderedList: false,
+            scrollSmooth: true,
+        });
+        b.setAttribute("onclick", "collapse_toc()");
+        b.innerHTML = "Collapse all"
+    }
+
+    function collapse_toc() {
+        var b = document.querySelector(".tocbot-toc-expand");
+        tocbot.init({
+            tocSelector: '.tocbot-list',
+            contentSelector: '.post-content',
+            headingSelector: 'h1, h2, h3, h4, h5',
+            collapseDepth: 1,
+            orderedList: false,
+            scrollSmooth: true,
+        });
+        b.setAttribute("onclick", "expand_toc()");
+        b.innerHTML = "Expand all"
+    }
+
+    function go_top() {
+        window.scrollTo(0, 0);
+    }
+
+    function go_bottom() {
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+</script>
+    
+
+    
+    <article class="post-wrap">
+        <header class="post-header">
+            <h1 class="post-title">Affinity Derivation and Graph Merge for Instance Segmentation</h1>
+            
+                <div class="post-meta">
+                    
+                        Author: <a itemprop="author" rel="author" href="/">Curtain</a>
+                    
+
+                    
+                        <span class="post-time">
+                        Date: <a href="#">June 21, 2019&nbsp;&nbsp;13:02:12</a>
+                        </span>
+                    
+                    
+                </div>
+            
+        </header>
+
+        <div class="post-content">
+            <h2 id="Intros"><a href="#Intros" class="headerlink" title="Intros"></a>Intros</h2><p>这篇文章是由中科大，北航和微软研究院共同完成的。本篇文章提出了一个proposal-free的one-stage实例分割算法。主要思想是通过学习像素点间的仿射关系(affinities)把instance segmentation的任务转化成一个二值问题，即判断两个像素点是不是属于同一个实例的问题。</p>
+<h2 id="Approach"><a href="#Approach" class="headerlink" title="Approach"></a>Approach</h2><h3 id="Structure"><a href="#Structure" class="headerlink" title="Structure"></a>Structure</h3><p>本篇文章的提出的实例分割方法主要分为两步，第一步提取语意信息和像素点间的关系，第二部就merge第一步的两个结果，最终达到实例分割的效果。<br><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ADGMIS-01.png" alt="structure"></p>
+<h3 id="Step-One"><a href="#Step-One" class="headerlink" title="Step One"></a>Step One</h3><p>第一步分为两个branch，Semantic branch和Instance branch。</p>
+<ul>
+<li><strong>Semantic branch</strong><br>Semantic branch采用的是SoAT语意分割框架Deeplabv3。也可以换用其他框架</li>
+<li><strong>Instance branch</strong></li>
+</ul>
+<p><strong>想法</strong>：我们的目的是将同一个instance的像素点merge在一起。如果这个物体是只有一块连通区域，我们只要merge两组点对，即$(p(x, y), p(x − 1, y))$和$(p(x, y), p(x , y - 1))$。但由于遮挡instace有时候是碎片化的，我们就需要定义一个检视范围，merge的时候只检视在这个范围里的像素点。我们定义这样一个点的集合是我们的检视范围：<br>$$N(x,y)=\bigcup_{d\in D} {N_{d}(x,y)}$$<br>其中<br>$$N_{d}(x,y)={ p(x+a,y+b), \forall a,b\in {d,0,-d}  \backslash {p(x,y)}}$$<br>D是距离的集合，本文取$D={1,2,4,8,16,32,64}$<br><strong>结构</strong>：<br><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ADGMIS-02.png" alt><br>由于$N(x,y)$有$7\times 8=56$个元素，我们指定最后一层的channel数量也是56，对应检视范围内的每个点和中心点是一个instance的可能性。<br><strong>训练</strong><br>训练的时候对于每个像素点生成56维的向量对应检视范围里的56个点。与该像素点是一个instance则置1，反之置0。</p>
+<h3 id="Step-Two-Graph-Merge"><a href="#Step-Two-Graph-Merge" class="headerlink" title="Step Two: Graph Merge"></a>Step Two: Graph Merge</h3><p>由Step One我们可以拿到所有像素点的集合$V$和所有像素点间的仿射关系$E$(对应概率矩阵P)，我们可以构成一个加权图$G=(V,E)$。由于点AB之间的仿射关系和点BA之间的仿射关系有相同的意义，所以我们让$e(a,b)=e(b,a)=\frac{1}{2}(P(a,b)+P(b,a))$，即对原始值取平均值。这样以来G同时又是一个无向图。</p>
+<p><strong>Graph Merge</strong><br>简单来说，就是每次寻找最大概率可能是一个instance的点对，把这两个点merge成一个超像素(super-pixel)。而后更新顶点集$V$, 边集$E$。循环整个过程直到选出点对最大概率小于一个阈值($r_\omega$)。最后把超像素代表的点集拿出来，如果点的个数大于一定阈值($r_c$)则保留这个instance。把这个点集的所有edge的权重求平均就是这个instance的confidence。<br><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ADGMIS-03.png" alt></p>
+<h2 id="Implement-Details"><a href="#Implement-Details" class="headerlink" title="Implement Details"></a>Implement Details</h2><p><strong>输入</strong><br>用$32\times 32$的超像素滑动，只要这个超像素里有前景像素，我们就把这个框认定成前景区域。对所有前景区域拓宽16个像素，再找到tightest bbox作为输入，在本文也叫ROI。</p>
+<p><strong>Pixel Affinity Refinement</strong><br>说到现在我们其实还没有用上<strong>Semantic branch</strong>的信息。<strong>Pixel Affinity Refinement</strong>要做的事就是利用上<strong>Semantic branch</strong>的语意信息来重新修正两个点之间的Affinity。很明显如果两个像素点的语意分类不是一类，那他们就不应该被分为同一个instance。<br>从<strong>instance branch</strong>我们得到一个3维的概率矩阵$P$。其中$P(x,y,c)$代表像素点$p(x,y)$和$p(x_c,y_c)$是一个instance的可能性。这个$P(x,y,c)$是没有<strong>Semantic branch</strong>提供的信息的。<br><strong>Semantic branch</strong>会输出一个有$(m+1)$个channel的概率矩阵，其中$m$是class的个数(m=0代表背景)。<br>$$\bf{P}(x,y)=(p_0(x,y), p_1(x,y),… ,p_m(x,y))$$<br>我们修正过的Affinity表示为：<br>$$P_r(x,y,c)=\sigma (\sum^{m}_{i=1}p_i(x,y)p_1(x_c,y_c))P(x,y,c) $$<br>其中<br>$$\sigma  = 2\times (\frac{1}{1+e^{-\alpha x}} - \frac{1}{2}) $$<br>可以看出来这个$\sigma$是从sigmoid函数改过来的，这里文章设$\alpha=5$来减小语意叉乘的影响。</p>
+<p>后来作者发现同一个大类下的子类经常会分类错误，但是大类间基本不会分错。于是他们把同一个大类下的所有类聚合成一个超类(<strong>Semantic branch</strong>), 并在训练的时候把不同大类的叉乘项强行置零。这几个措施会让结果好看不少。</p>
+<p><strong>Resizing ROI</strong><br>ROI都rescale到$513\times 513$</p>
+<p><strong>Forcing Local Merge</strong><br>强制在$m\times m$的局部先进行local merge。局部merge完了再merge其他的像素点。</p>
+<h2 id="Performance"><a href="#Performance" class="headerlink" title="Performance"></a>Performance</h2><p>见论文[<a href="https://arxiv.org/abs/1811.10870]" target="_blank" rel="noopener">https://arxiv.org/abs/1811.10870]</a></p>
+
+        </div>
+
+        
+            <section class="post-copyright">
+                
+                    <p class="copyright-item">
+                        <span>Author:</span>
+                        <span>Curtain</span>
+                    </p>
+                
+                
+                    <p class="copyright-item">
+                        <span>Permalink:</span>
+                        <span><a href="http://yoursite.com/2019/06/21/ADGMIS/">http://yoursite.com/2019/06/21/ADGMIS/</a></span>
+                    </p>
+                
+                
+                    <p class="copyright-item">
+                        <span>License:</span>
+                        <span>Copyright (c) 2019 <a href="http://creativecommons.org/licenses/by-nc/4.0/">CC-BY-NC-4.0</a> LICENSE</span>
+                    </p>
+                
+                
+                     <p class="copyright-item">
+                         <span>Slogan:</span>
+                         <span>test tet?</span>
+                     </p>
+                
+
+            </section>
+        
+        <section class="post-tags">
+            <div>
+                <span>Tag(s):</span>
+                <span class="tag">
+                    
+                    
+                        <a href="/tags/Deep-Learning/"># Deep-Learning</a>
+                    
+                        <a href="/tags/Papers/"># Papers</a>
+                    
+                        
+                </span>
+            </div>
+            <div>
+                <a href="javascript:window.history.back();">back</a>
+                <span>· </span>
+                <a href="/">home</a>
+            </div>
+        </section>
+        <section class="post-nav">
+            
+                <a class="prev" rel="prev" href="/2019/09/25/FasterRCNN_Notes/">Faster RCNN 系列细节笔记</a>
+            
+            
+            <a class="next" rel="next" href="/2019/06/19/FLOPs-md/">深度学习里的计算量</a>
+            
+        </section>
+
+
+    </article>
+</div>
+
+        </div>
+        <footer id="footer" class="footer">
+    <div class="copyright">
+        <span>© Curtain | Powered by <a href="https://hexo.io" target="_blank">Hexo</a> & <a href="https://github.com/Siricee/hexo-theme-Chic" target="_blank">Chic</a></span>
+    </div>
+</footer>
+
+    </div>
+</body>
+</html>
