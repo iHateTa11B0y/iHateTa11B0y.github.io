@@ -7,7 +7,7 @@
 
 
 
-<title>深度学习里的计算量 | Cowhisper</title>
+<title>How to load an image -- Be well aware of what you load. | Cowhisper</title>
 
 
 
@@ -169,7 +169,7 @@
     
     <article class="post-wrap">
         <header class="post-header">
-            <h1 class="post-title">深度学习里的计算量</h1>
+            <h1 class="post-title">How to load an image -- Be well aware of what you load.</h1>
             
                 <div class="post-meta">
                     
@@ -178,7 +178,7 @@
 
                     
                         <span class="post-time">
-                        Date: <a href="#">June 19, 2019&nbsp;&nbsp;17:01:32</a>
+                        Date: <a href="#">October 14, 2019&nbsp;&nbsp;15:54:42</a>
                         </span>
                     
                     
@@ -187,10 +187,34 @@
         </header>
 
         <div class="post-content">
-            <h2 id="FLOPS"><a href="#FLOPS" class="headerlink" title="FLOPS"></a>FLOPS</h2><p>注意全大写，是floating point operations per second的缩写，意指每秒浮点运算次数，理解为计算速度。是一个衡量硬件性能的指标。</p>
-<h2 id="FLOPs"><a href="#FLOPs" class="headerlink" title="FLOPs"></a>FLOPs</h2><p>注意s小写，是floating point operations的缩写（s表复数），意指浮点运算数，理解为计算量。可以用来衡量算法/模型的复杂度</p>
-<h2 id="conv层的计算量计算"><a href="#conv层的计算量计算" class="headerlink" title="conv层的计算量计算"></a>conv层的计算量计算</h2><p>在不考虑激活层和batch size的情况下<br>$FLOPs = (2\times C_i \times K^2 -1) \times H \times W \times C_o$<br>$C_i$ input channel, $K$ kernel size, $H,W$ output feature map size, $C_o$ ouput channel.<br>2是因为MAC算两个op。 在不考虑bias时有-1。<br>理解：<br>$(2\times C_i \times K^2 -1) = (C_i \times K^2) + (C_i \times K^2 -1)$<br>第一项时乘法运算数， 第二项是加法运算数</p>
-<h2 id="FC层计算量计算"><a href="#FC层计算量计算" class="headerlink" title="FC层计算量计算"></a>FC层计算量计算</h2><p>$FLOPs = (2 \times I - 1)\times O$<br>$I$ input neuron number, $O$ output neuron number.</p>
+            <p>这篇文章呢主要是记录一些pillow和opencv读图的时候的一些注意事项和常用操作。</p>
+<p>为了省事，下面代码块默认已经做过下面两行</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">from PIL import Image</span><br><span class="line">import cv2</span><br></pre></td></tr></table></figure>
+
+<h3 id="读图操作"><a href="#读图操作" class="headerlink" title="读图操作"></a>读图操作</h3><ul>
+<li><p>本地读图</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">* PIL</span><br><span class="line">img = Image.open(image_path)</span><br><span class="line">* OpenCV</span><br><span class="line">cvimg = cv2.imread(image_path)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>url读图</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">* PIL</span><br><span class="line">import requests</span><br><span class="line">imfile = requests.get(path)</span><br><span class="line">Image.open(BytesIO(imfile.content)).convert(&apos;RGB&apos;)</span><br><span class="line"></span><br><span class="line">* OpenCV</span><br><span class="line">img_nparr = np.fromstring(cv_session.get(url).content, np.uint8)</span><br><span class="line">img = cv2.imdecode(img_nparr, cv2.IMREAD_COLOR)</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<h3 id="差异"><a href="#差异" class="headerlink" title="差异"></a>差异</h3><ul>
+<li>通道：pillow 读出来的图片通道顺序是RGB，OpenCV读出来的通道顺序是BGR。</li>
+<li>尺寸：<code>PIL.Image</code>有size成员变量但是没有shape，<code>cv2.imread</code> 读出来的是numpy array没有size只有shape<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">w,h = pil_image.size</span><br><span class="line">h,w,c = cv2_image.shape</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<h3 id="数据格式转换"><a href="#数据格式转换" class="headerlink" title="数据格式转换"></a>数据格式转换</h3><ul>
+<li><p>PIL.Image to numpy array</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pilimg = Image.open(img_path)</span><br><span class="line">cvimg = cv2.cvtColor(numpy.asarray(pilimg),cv2.COLOR_RGB2BGR)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>numpy array to PIL.Image</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">cvimg = cv2.imread(img_path)</span><br><span class="line">cvimg = cv2.cvtColor(cvimg,cv2.COLOR_BGR2RGB)</span><br><span class="line">pil_img = Image.fromarray(cvimg)</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
 
         </div>
 
@@ -214,7 +238,7 @@
                 <span class="tag">
                     
                     
-                        <a href="/tags/Deep-Learning/"># Deep-Learning</a>
+                        <a href="/tags/Image-Processing/"># Image Processing</a>
                     
                         
                 </span>
@@ -227,8 +251,8 @@
         </section>
         <section class="post-nav">
             
-                <a class="prev" rel="prev" href="/2019/06/21/ADGMIS/">Affinity Derivation and Graph Merge for Instance Segmentation</a>
             
+            <a class="next" rel="next" href="/2019/09/25/FasterRCNN_Notes/">Faster RCNN 系列细节笔记</a>
             
         </section>
 

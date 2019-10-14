@@ -35,6 +35,44 @@
     
     
         
+            <!-- MathJax配置，可通过单美元符号书写行内公式等 -->
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+    "HTML-CSS": {
+        preferredFont: "TeX",
+        availableFonts: ["STIX","TeX"],
+        linebreaks: { automatic:true },
+        EqnChunk: (MathJax.Hub.Browser.isMobile ? 10 : 50)
+    },
+    tex2jax: {
+        inlineMath: [ ["$", "$"], ["\\(","\\)"] ],
+        processEscapes: true,
+        ignoreClass: "tex2jax_ignore|dno",
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    },
+    TeX: {
+        equationNumbers: { autoNumber: "AMS" },
+        noUndefined: { attributes: { mathcolor: "red", mathbackground: "#FFEEEE", mathsize: "90%" } },
+        Macros: { href: "{}" }
+    },
+    messageStyle: "none"
+    });
+</script>
+<!-- 给MathJax元素添加has-jax class -->
+<script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i=0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+</script>
+<!-- 通过连接CDN加载MathJax的js代码 -->
+<script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
+
+        
     
 
 
@@ -195,7 +233,7 @@
 <ul>
 <li>STRIDE_1x1<br>这个配置是是True表明在resne(x)t的bottleneck module里stride做在最开始的1x1的conv里，False表明stride做在3x3的conv里。</li>
 <li>CONV_BODY_FREEZE_AT<br>据说是目标检测的batch size比较小，freeze前两层训练会比较稳定</li>
-<li>BN的eps<br>先看下BatchNorm的公式。<br>$$\frac{\gamma(x-E[x])}{\sqrt{Var[x]+eps}} +\beta = \frac{\gamma x}{\sqrt{Var[x]+eps}} + (\beta-\frac{\gamma E[x]}{\sqrt{Var[x]+eps}})$$<br>$=\hat{\gamma}x+\hat{\beta}$<br>caffe2存下来的其实bn的weight, bias其实是$\hat{\gamma}$和$\hat{\beta}$，但是maskrcnn-benchmark load weight的时候是把他们分别load为$\gamma$和$\beta$然后running_mean, running_var分别初始化为0, 1 tensor ，这两者在eps=0的时候是完全等价的。</li>
+<li>BN的eps<br>先看下BatchNorm的公式。<br>$$\frac{\gamma(x-E[x])}{\sqrt{Var[x]+eps}} +\beta = \frac{\gamma x}{\sqrt{Var[x]+eps}} + (\beta-\frac{\gamma E[x]}{\sqrt{Var[x]+eps}})$$<br>$$=\hat{\gamma}x+\hat{\beta}$$<br>caffe2存下来的其实bn的weight, bias其实是$\hat{\gamma}$和$\hat{\beta}$，但是maskrcnn-benchmark load weight的时候是把他们分别load为$\gamma$和$\beta$然后running_mean, running_var分别初始化为0, 1 tensor ，这两者在eps=0的时候是完全等价的。</li>
 </ul>
 <h1 id="RPN"><a href="#RPN" class="headerlink" title="RPN"></a>RPN</h1><h2 id="网络结构"><a href="#网络结构" class="headerlink" title="网络结构"></a>网络结构</h2><p>fpn出来各层的feature map都通过同一个3x3 stride 1的conv后接一个1x1的conv bbox_reg和1x1的conv cls_logits.</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">in_channel = c</span><br><span class="line">num_anchor = n</span><br><span class="line">[feature_map_lv_i] --&gt; 3x3 stride1 conv --&gt; 1x1 stride1 conv ([bbox_reg_lv_i])</span><br><span class="line">                     out_channel=c  |   out_channel= n*4</span><br><span class="line">                                    |--&gt; 1x1 stride1 conv ([cls_logits_lv_i])</span><br><span class="line">                                        out_channel = n</span><br></pre></td></tr></table></figure>
@@ -229,22 +267,7 @@
                     </p>
                 
                 
-                    <p class="copyright-item">
-                        <span>Permalink:</span>
-                        <span><a href="http://yoursite.com/2019/09/25/FasterRCNN_Notes/">http://yoursite.com/2019/09/25/FasterRCNN_Notes/</a></span>
-                    </p>
                 
-                
-                    <p class="copyright-item">
-                        <span>License:</span>
-                        <span>Copyright (c) 2019 <a href="http://creativecommons.org/licenses/by-nc/4.0/">CC-BY-NC-4.0</a> LICENSE</span>
-                    </p>
-                
-                
-                     <p class="copyright-item">
-                         <span>Slogan:</span>
-                         <span>test tet?</span>
-                     </p>
                 
 
             </section>
@@ -269,6 +292,8 @@
             </div>
         </section>
         <section class="post-nav">
+            
+                <a class="prev" rel="prev" href="/2019/10/14/image-load/">How to load an image -- Be well aware of what you load.</a>
             
             
             <a class="next" rel="next" href="/2019/06/21/ADGMIS/">Affinity Derivation and Graph Merge for Instance Segmentation</a>
