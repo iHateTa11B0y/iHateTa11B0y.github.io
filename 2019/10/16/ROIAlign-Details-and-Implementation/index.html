@@ -7,7 +7,7 @@
 
 
 
-<title>Evaluation Metrics in Object Detectron | Cowhisper</title>
+<title>ROIAlign details &amp; implementation | Cowhisper</title>
 
 
 
@@ -207,7 +207,7 @@
     
     <article class="post-wrap">
         <header class="post-header">
-            <h1 class="post-title">Evaluation Metrics in Object Detectron</h1>
+            <h1 class="post-title">ROIAlign details &amp; implementation</h1>
             
                 <div class="post-meta">
                     
@@ -216,7 +216,7 @@
 
                     
                         <span class="post-time">
-                        Date: <a href="#">October 15, 2019&nbsp;&nbsp;17:19:46</a>
+                        Date: <a href="#">October 16, 2019&nbsp;&nbsp;10:57:49</a>
                         </span>
                     
                     
@@ -225,29 +225,29 @@
         </header>
 
         <div class="post-content">
-            <h2 id="垃圾话环节"><a href="#垃圾话环节" class="headerlink" title="垃圾话环节"></a>垃圾话环节</h2><p>我也想给大家展望一下未来回顾一下过去，但是最近真的很忙(lan)，垃圾话就少说点。今天就写点目标检测的评价指标。</p>
-<h2 id="基本概念"><a href="#基本概念" class="headerlink" title="基本概念"></a>基本概念</h2><p>首先介绍几个基本概念好让我们更好的理解我们今天内容</p>
+            <h2 id="垃圾话环节"><a href="#垃圾话环节" class="headerlink" title="垃圾话环节"></a>垃圾话环节</h2><p>我也想给大家回顾一下过去展望一下未来，但是我最近真的太忙(lan)了。所以…好好别扔臭鸡蛋了！我说还不行么！</p>
+<p>说ROIAlign之前我们要提一下它的前身ROIPooling。ROIPooling 是存在于two-stage detector两个stage之间的一个特征聚合层。由stage-one 出来的proposal的尺寸往往大小不尽相同，对应的roi feature也是大小不尽相同，这对于后面处理造成很大的麻烦，于是ROIPooling应运而生。通过ROIPooling，roi feature 被池化成相同的大小而后送到stage-two的网络里。</p>
+<p>但是ROIPooling也有着自己的弊端，粗略的量化导致了一些不一致的问题(mis-alignment)。所以ROIAlign就是为了解决这些问题。</p>
+<h2 id="ROI-Pooling-的局限性分析-1"><a href="#ROI-Pooling-的局限性分析-1" class="headerlink" title="ROI Pooling 的局限性分析[1]"></a>ROI Pooling 的局限性分析[1]</h2><p>在常见的两级检测框架（比如Fast-RCNN，Faster-RCNN，RFCN）中，ROI Pooling 的作用是根据预选框的位置坐标在特征图中将相应区域池化为固定尺寸的特征图，以便进行后续的分类和包围框回归操作。由于预选框的位置通常是由模型回归得到的，一般来讲是浮点数，而池化后的特征图要求尺寸固定。故ROI Pooling这一操作存在两次量化的过程。</p>
 <ul>
-<li><strong>IOU</strong>.  Intersection of Union.<br>Just as plain as the name says. 在目标检测任务中，我们用IOU来评价一个预测是不是正确。如果某个预测和GT(groud truth)的IOU大于一个我们设置的阈值，我们就可以把这个预测作为正例(<strong>positive</strong>)。</li>
-<li><strong>TP</strong>.<br> 即True Positive。既前景预测正确，预测框和GT框IOU满足阈值条件。</li>
-<li><strong>TN</strong>.<br> 即True Negative。即背景预测正确。</li>
-<li><strong>FP</strong>.<br> 即False Positive。即误报，预测了一个不存在物体（一般是检出的物体与GT不满足IOU阈值条件）。</li>
-<li><strong>FN</strong>.<br>即False Negative。即漏报，检出是背景，但是这里其实是有物体的。</li>
+<li>将候选框边界量化为整数点坐标值</li>
+<li>将量化后的边界区域平均分割成 k x k 个单元(bin),对每一个单元的边界进行量化。</li>
 </ul>
-<h2 id="Precision-amp-Recall"><a href="#Precision-amp-Recall" class="headerlink" title="Precision &amp; Recall"></a>Precision &amp; Recall</h2><p>precision和recall是两个经常见到的指标</p>
-<h3 id="Precision"><a href="#Precision" class="headerlink" title="Precision"></a>Precision</h3><p>precision表示的是所有检出的正例中有多少是GT（预测的准确率）。这里 $t$ 代表的是区分正例(positive)和反例(negative)的阈值。<br>$$precision=\frac{TP(t)}{TP(t)+FP(t)}$$</p>
-<h3 id="Recall"><a href="#Recall" class="headerlink" title="Recall"></a>Recall</h3><p>recall表示的是所有GT中有多少被检出了（GT的检测率）。<br>$$recall=\frac{TP(t)}{TP(t)+FN(t)}$$</p>
-<h2 id="AP"><a href="#AP" class="headerlink" title="AP"></a>AP</h2><p>AP读作Average Precision。</p>
-<p>由上面Precision和Recall的定义我们可以看出来，我们很难只用Precision或者Recall来描述一个测试集上预测结果的好坏。Prcision高，有可能GT漏检很多（recall低），同样Recall高 precision也可能很低。</p>
-<p>所以脱离recall谈precision是没有意义的，反之亦然。所以才会需要AP。下面介绍AP的计算方法。</p>
-<ol>
-<li><strong>对于某个category</strong>, 我们把检测的置信度从高到低进行排序。</li>
-<li>假设这张图片中GT共有M个，我们把Recall所有可能值写出来$(0, \frac{1}{M}, \frac{2}{M}, …, 1)$共M+1个。对于其中每个recall值$r_i$我们可以在$recall&gt;r_i$的条件下计算出一个最大的precision $p_{recall&gt;r_i}$。最后对所有算出的precision求均值就是AP。即<br>$$AP=\frac{1}{M+1} \sum{p_{recall&gt;r_i}}$$</li>
-</ol>
-<h2 id="mAP"><a href="#mAP" class="headerlink" title="mAP"></a>mAP</h2><p>mAP读作mean Average Precision。别问为啥不是average average precision。我也想问呢。</p>
-<p>我们刚刚说的AP是<strong>对于某个category</strong>, 但是一张图里可能好多category，就categories。所以这个mean指的是所有category AP的mean。</p>
-<h2 id="更多的Metrics"><a href="#更多的Metrics" class="headerlink" title="更多的Metrics"></a>更多的Metrics</h2><p>评价指标由很多，具体选用哪个要根据具体场景需求。例如，如果是做搜索，那就是保证召回的情况下提升准确率；如果做疾病监测、反垃圾，则是保准确率的条件下，提升召回。</p>
-<h3 id="F1-Score"><a href="#F1-Score" class="headerlink" title="F1 Score"></a>F1 Score</h3><p>在两者都要求高的情况下，可以用F1来衡量<br>$$ F1 = \frac{2\times P\times R}{P+R}$$</p>
+<p>事实上，经过上述两次量化，此时的候选框已经和最开始回归出来的位置有一定的偏差，这个偏差会影响检测或者分割的准确度。在论文里，作者把它总结为“不匹配问题（misalignment）。</p>
+<p>下面我们用直观的例子具体分析一下上述区域不匹配问题。如  <strong>图1</strong>  所示，这是一个Faster-RCNN检测框架。输入一张$800\times 800$的图片，图片上有一个$665\times 665$的包围框(框着一只狗)。图片经过主干网络提取特征后，特征图缩放步长（stride）为32。因此，图像和包围框的边长都是输入时的1/32。800正好可以被32整除变为25。但665除以32以后得到20.78，带有小数，于是ROI Pooling  <strong>直接将它量化成20</strong>。接下来需要把框内的特征池化$7\times 7$的大小，因此将上述包围框平均分割成$7\times 7$个矩形区域。显然，每个矩形区域的边长为2.86，又含有小数。于是ROI Pooling  <strong>再次把它量化到2</strong>。经过这两次量化，候选区域已经出现了较明显的偏差（如图中绿色部分所示）。更重要的是，该层特征图上0.1个像素的偏差，缩放到原图就是3.2个像素。<strong>那么0.8的偏差，在原图上就是接近30个像素点的差别</strong>，这一差别不容小觑。</p>
+<p><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ROIAlign_1.png" alt="ROIPooling"></p>
+<h2 id="ROI-Align-的主要思想和具体方法"><a href="#ROI-Align-的主要思想和具体方法" class="headerlink" title="ROI Align 的主要思想和具体方法"></a>ROI Align 的主要思想和具体方法</h2><p>为了解决ROI Pooling的上述缺点，作者提出了ROI Align这一改进的方法(如<strong>图ROIAlign_1</strong>)。ROI Align的思路很简单：取消量化操作，使用双线性内插的方法获得坐标为浮点数的像素点上的图像数值,从而将整个特征聚集过程转化为一个连续的操作，。值得注意的是，在具体的算法操作上，ROI Align并不是简单地补充出候选区域边界上的坐标点，然后将这些坐标点进行池化，而是重新设计了一套比较优雅的流程，如 <strong>图ROIAlign_2</strong> 所示：</p>
+<ul>
+<li>遍历每一个候选区域，保持浮点数边界不做量化</li>
+<li>将候选区域分割成k x k个单元，每个单元的边界也不做量化</li>
+<li>在每个单元中计算固定四个坐标位置，用双线性内插的方法计算出这四个位置的值，然后进行最大池化操作</li>
+</ul>
+<p>这里对上述步骤的第三点作一些说明：这个固定位置是指<strong>在每一个矩形单元（bin）中按照固定规则确定的位置</strong>。比如，如果采样点数是1，那么就是这个单元的中心点。如果采样点数是4，那么就是把这个单元平均分割成四个小方块以后它们分别的中心点。显然这些采样点的坐标通常是浮点数，所以需要使用插值的方法得到它的像素值。在相关实验中，作者发现将采样点设为4会获得最佳性能，甚至直接设为1在性能上也相差无几。事实上，ROI Align 在遍历取样点的数量上没有ROIPooling那么多，但却可以获得更好的性能，这主要归功于解决了misalignment的问题。值得一提的是，我在实验时发现，ROI Align在VOC2007数据集上的提升效果并不如在COCO上明显。经过分析，造成这种区别的原因是COCO上小目标的数量更多，而小目标受misalignment问题的影响更大（比如，同样是0.5个像素点的偏差，对于较大的目标而言显得微不足道，但是对于小目标，误差的影响就要高很多。<br><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ROIAlign_1.png" alt="ROIAlign_1">))<br><img src="https://raw.githubusercontent.com/iHateTa11B0y/Markdown-Pics/master/ROIAlign_2.png" alt="ROIAlign_2"></p>
+<h2 id="Code-Refence"><a href="#Code-Refence" class="headerlink" title="Code Refence"></a>Code Refence</h2><p>以FAIR的<a href="[https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/modeling/poolers.py](https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/modeling/poolers.py)">maskrcnn-benchmark</a>为例，ROIAlign实例化需要三个参数。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ROIAlign(</span><br><span class="line">         output_size, </span><br><span class="line">         spatial_scale=scale,</span><br><span class="line">         sampling_ratio=sampling_ratio</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>spatial_scale</code>是当前feature map相对与原图的scale，<code>sampling_ratio</code>就是每个bin中采样点的个数开平方。</p>
+<h2 id="Reference"><a href="#Reference" class="headerlink" title="Reference"></a>Reference</h2><p>这篇文章大部分篇幅来自一篇我很喜欢的博客，讲的很清晰。欢迎大噶也去看看！侵删。<br>[1]. <a href="http://blog.leanote.com/post/afanti.deng@gmail.com/b5f4f526490b" target="_blank" rel="noopener">http://blog.leanote.com/post/afanti.deng@gmail.com/b5f4f526490b</a></p>
 
         </div>
 
@@ -284,10 +284,8 @@
         </section>
         <section class="post-nav">
             
-                <a class="prev" rel="prev" href="/2019/10/16/ROIAlign-Details-and-Implementation/">ROIAlign details & implementation</a>
             
-            
-            <a class="next" rel="next" href="/2019/10/14/image-load/">How to load an image -- Be well aware of what you load.</a>
+            <a class="next" rel="next" href="/2019/10/15/Evaluation-Metrics-in-Object-Detectron-md/">Evaluation Metrics in Object Detectron</a>
             
         </section>
 
